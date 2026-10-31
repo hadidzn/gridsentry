@@ -22,7 +22,7 @@ const agentCard = {
   name: agentName,
   description: "Grid Trading AI Agent for BNB Chain Testnet",
   version: "0.1.0",
-  url: "http://localhost:3000",
+  url: process.env.PUBLIC_AGENT_URL || `http://localhost:${PORT}`,
   capabilities: {
     streaming: false
   },
