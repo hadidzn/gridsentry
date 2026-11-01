@@ -1,10 +1,10 @@
-
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
   buildGrid,
-  evaluatePrice
+  evaluatePrice,
+  validateGridConfig
 } from "../src/grid-engine.js";
 
 test("Grid creates 3 price levels", () => {
@@ -15,19 +15,12 @@ test("Grid creates 3 price levels", () => {
   });
 
   assert.equal(levels.length, 3);
-  assert.deepEqual(
-    levels.map(item => item.price),
-    [100, 150, 200]
-  );
+  assert.deepEqual(levels.map(item => item.price), [100, 150, 200]);
 });
 
 test("Evaluation remains simulation only", () => {
   const result = evaluatePrice(
-    {
-      lowerPrice: 100,
-      upperPrice: 200,
-      levels: 3
-    },
+    { lowerPrice: 100, upperPrice: 200, levels: 3 },
     151,
     149
   );
@@ -36,12 +29,33 @@ test("Evaluation remains simulation only", () => {
   assert.equal(result.signal, "SIMULATED_SELL");
 });
 
-test("Invalid grid configuration is rejected", () => {
+test("Invalid grid price range is rejected", () => {
   assert.throws(() =>
-    buildGrid({
-      lowerPrice: 200,
-      upperPrice: 100,
-      levels: 3
-    })
+    buildGrid({ lowerPrice: 200, upperPrice: 100, levels: 3 })
+  );
+});
+
+test("Order size must be positive and finite", () => {
+  for (const orderSize of [0, -1, NaN, Infinity, "invalid"]) {
+    assert.throws(() =>
+      validateGridConfig({
+        lowerPrice: 100,
+        upperPrice: 200,
+        levels: 3,
+        orderSize
+      }),
+      /Order size/
+    );
+  }
+});
+
+test("Invalid previous price is rejected", () => {
+  assert.throws(() =>
+    evaluatePrice(
+      { lowerPrice: 100, upperPrice: 200, levels: 3 },
+      150,
+      NaN
+    ),
+    /previous price/
   );
 });
