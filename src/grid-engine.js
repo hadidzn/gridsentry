@@ -1,8 +1,12 @@
-
 export function validateGridConfig(config) {
+  if (!config || typeof config !== "object") {
+    throw new Error("Invalid grid configuration");
+  }
+
   const lower = Number(config.lowerPrice);
   const upper = Number(config.upperPrice);
   const levels = Number(config.levels);
+  const orderSize = Number(config.orderSize ?? 1);
 
   if (
     !Number.isFinite(lower) ||
@@ -17,32 +21,24 @@ export function validateGridConfig(config) {
     throw new Error("Levels must be between 2 and 100");
   }
 
-  return {
-    lowerPrice: lower,
-    upperPrice: upper,
-    levels,
-    orderSize: Number(config.orderSize ?? 1)
-  };
+  if (!Number.isFinite(orderSize) || orderSize <= 0) {
+    throw new Error("Order size must be a positive finite number");
+  }
+
+  return { lowerPrice: lower, upperPrice: upper, levels, orderSize };
 }
 
 export function buildGrid(config) {
   const cfg = validateGridConfig(config);
-  const step =
-    (cfg.upperPrice - cfg.lowerPrice) / (cfg.levels - 1);
+  const step = (cfg.upperPrice - cfg.lowerPrice) / (cfg.levels - 1);
 
   return Array.from({ length: cfg.levels }, (_, index) => ({
     index,
-    price: Number(
-      (cfg.lowerPrice + step * index).toFixed(8)
-    )
+    price: Number((cfg.lowerPrice + step * index).toFixed(8))
   }));
 }
 
-export function evaluatePrice(
-  config,
-  marketPrice,
-  previousPrice = null
-) {
+export function evaluatePrice(config, marketPrice, previousPrice = null) {
   const cfg = validateGridConfig(config);
   const price = Number(marketPrice);
 
@@ -50,31 +46,32 @@ export function evaluatePrice(
     throw new Error("Invalid market price");
   }
 
-  const grid = buildGrid(cfg);
+  let previous = null;
+  if (previousPrice !== null) {
+    previous = Number(previousPrice);
+    if (!Number.isFinite(previous) || previous <= 0) {
+      throw new Error("Invalid previous price");
+    }
+  }
 
+  const grid = buildGrid(cfg);
   const nearest = grid.reduce((best, level) =>
-    Math.abs(level.price - price) <
-    Math.abs(best.price - price)
+    Math.abs(level.price - price) < Math.abs(best.price - price)
       ? level
       : best
   );
 
   let signal = "HOLD";
-
-  if (previousPrice !== null) {
-    const previous = Number(previousPrice);
-
-    if (price > previous &&
-        grid.some(level =>
-          previous < level.price && price >= level.price
-        )) {
+  if (previous !== null) {
+    if (
+      price > previous &&
+      grid.some(level => previous < level.price && price >= level.price)
+    ) {
       signal = "SIMULATED_SELL";
-    }
-
-    if (price < previous &&
-        grid.some(level =>
-          previous > level.price && price <= level.price
-        )) {
+    } else if (
+      price < previous &&
+      grid.some(level => previous > level.price && price <= level.price)
+    ) {
       signal = "SIMULATED_BUY";
     }
   }
@@ -88,4 +85,4 @@ export function evaluatePrice(
     orderSize: cfg.orderSize,
     note: "Simulation only. No transaction sent."
   };
-    }
+}
